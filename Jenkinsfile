@@ -9,6 +9,12 @@ pipeline {
 
   environment {
     DOCKER_BUILDKIT = '1'
+    DEPLOY_ENV = 'local'
+    REGISTRY = 'docker.io/myuser'
+    IMAGE_PREFIX = 'log'
+    IMAGE_TAG = 'latest'
+    COMPOSE_FILE = "docker-compose.local.yml"
+    PROJECT_NAME = "log-generator-local"
   }
 
   stages {
@@ -20,17 +26,10 @@ pipeline {
       }
     }
 
-    stage('Prepare') {
+    stage('Build Images') {
       steps {
         ansiColor('xterm') {
           script {
-            def deployEnv = 'local'
-            def registry = 'docker.io/myuser'
-            def imagePrefix = 'log'
-            def imageTag = 'latest'
-            def composeFile = "docker-compose.${deployEnv}.yml"
-            def projectName = "log-generator-${deployEnv}"
-
             def services = [
               [name: 'log-collector',         context: 'log-collector',         dockerfile: 'Dockerfile'],
               [name: 'log-generator',         context: 'log-generator',         dockerfile: 'Dockerfile'],
@@ -42,40 +41,18 @@ pipeline {
               [name: 'persistor-system',      context: 'persistor-system',      dockerfile: 'Dockerfile']
             ]
 
-            writeJSON file: 'pipeline_config.json', json: [
-              deployEnv: deployEnv,
-              registry: registry,
-              imagePrefix: imagePrefix,
-              imageTag: imageTag,
-              composeFile: composeFile,
-              projectName: projectName,
-              services: services
-            ]
-          }
-        }
-      }
-    }
-
-    stage('Build Images') {
-      steps {
-        ansiColor('xterm') {
-          script {
-            def config = readJSON file: 'pipeline_config.json'
             def branches = [:]
-            for (svc in config.services) {
-              def svcName = svc.name
-              def svcContext = svc.context
-              def svcDockerfile = svc.dockerfile
-              branches[svcName] = {
+            services.each { svc ->
+              branches[svc.name] = {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                  dir(svcContext) {
+                  dir(svc.context) {
                     sh """
-                      echo '🔧 Building service: ${svcName}'
-                      REPO_BASE="${config.registry}/${config.imagePrefix}-${svcName}"
+                      echo '🔧 Building service: ${svc.name}'
+                      REPO_BASE="${REGISTRY}/${IMAGE_PREFIX}-${svc.name}"
                       echo "Using REPO_BASE: \$REPO_BASE"
                       docker build --pull \
-                        -f "${svcDockerfile}" \
-                        -t "\$REPO_BASE:${config.imageTag}" \
+                        -f "${svc.dockerfile}" \
+                        -t "\$REPO_BASE:${IMAGE_TAG}" \
                         -t "\$REPO_BASE:latest" \
                         .
                     """
@@ -93,12 +70,22 @@ pipeline {
       steps {
         ansiColor('xterm') {
           script {
-            def config = readJSON file: 'pipeline_config.json'
-            for (svc in config.services) {
+            def services = [
+              [name: 'log-collector'],
+              [name: 'log-generator'],
+              [name: 'log-listener'],
+              [name: 'log-ui'],
+              [name: 'persistor-application'],
+              [name: 'persistor-auth'],
+              [name: 'persistor-payment'],
+              [name: 'persistor-system']
+            ]
+
+            services.each { svc ->
               def svcName = svc.name
               sh """
-                REPO_BASE="${config.registry}/${config.imagePrefix}-${svcName}"
-                docker push "\$REPO_BASE:${config.imageTag}"
+                REPO_BASE="${REGISTRY}/${IMAGE_PREFIX}-${svcName}"
+                docker push "\$REPO_BASE:${IMAGE_TAG}"
                 docker push "\$REPO_BASE:latest"
               """
             }
@@ -110,13 +97,10 @@ pipeline {
     stage('Deploy') {
       steps {
         ansiColor('xterm') {
-          script {
-            def config = readJSON file: 'pipeline_config.json'
-            sh """
-              docker compose -p "${config.projectName}" -f "${config.composeFile}" up -d --no-build --remove-orphans
-              docker compose -p "${config.projectName}" -f "${config.composeFile}" ps
-            """
-          }
+          sh """
+            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans
+            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps
+          """
         }
       }
     }
@@ -124,12 +108,9 @@ pipeline {
     stage('Smoke Check') {
       steps {
         ansiColor('xterm') {
-          script {
-            def config = readJSON file: 'pipeline_config.json'
-            sh """
-              docker compose -p "${config.projectName}" -f "${config.composeFile}" logs --no-color --tail=100 || true
-            """
-          }
+          sh """
+            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=100 || true
+          """
         }
       }
     }
@@ -138,22 +119,16 @@ pipeline {
   post {
     success {
       ansiColor('xterm') {
-        script {
-          def config = readJSON file: 'pipeline_config.json'
-          echo "✅ Build and deployment successful for ${config.projectName}"
-        }
+        echo "✅ Build and deployment successful for ${PROJECT_NAME}"
       }
     }
     failure {
       ansiColor('xterm') {
-        script {
-          def config = readJSON file: 'pipeline_config.json'
-          echo "❌ Build/Deploy failed. Dumping logs..."
-          sh """
-            docker compose -p "${config.projectName}" -f "${config.composeFile}" ps || true
-            docker compose -p "${config.projectName}" -f "${config.composeFile}" logs --no-color --tail=200 || true
-          """
-        }
+        echo "❌ Build/Deploy failed. Dumping logs..."
+        sh """
+          docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps || true
+          docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=200 || true
+        """
       }
     }
     always {
