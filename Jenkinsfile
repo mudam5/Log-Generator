@@ -10,7 +10,7 @@ pipeline {
   environment {
     DOCKER_BUILDKIT = '1'
     DEPLOY_ENV = 'local'
-    REGISTRY = 'docker.io/myuser'
+    REGISTRY = 'docker.io/mudam5'
     IMAGE_PREFIX = 'log'
     IMAGE_TAG = 'latest'
     COMPOSE_FILE = "docker-compose.local.yml"
