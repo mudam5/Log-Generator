@@ -2,7 +2,6 @@ pipeline {
   agent any
 
   options {
-    ansiColor('xterm')
     timestamps()
     buildDiscarder(logRotator(numToKeepStr: '20'))
     disableConcurrentBuilds()
@@ -42,41 +41,46 @@ pipeline {
 
   stages {
     stage('Checkout') {
-      steps { checkout scm }
+      steps {
+        ansiColor('xterm') {
+          checkout scm
+        }
+      }
     }
 
     stage('Prepare') {
       steps {
-        script {
-          env.GIT_SHA = sh(script: "git rev-parse --short=7 HEAD", returnStdout: true).trim()
-          env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_SHA}"
-          env.COMPOSE_FILE = "docker-compose.${params.DEPLOY_ENV}.yml"
-          env.PROJECT_NAME = "log-generator-${params.DEPLOY_ENV}"
+        ansiColor('xterm') {
+          script {
+            env.GIT_SHA = sh(script: "git rev-parse --short=7 HEAD", returnStdout: true).trim()
+            env.IMAGE_TAG = "${env.BUILD_NUMBER}-${env.GIT_SHA}"
+            env.COMPOSE_FILE = "docker-compose.${params.DEPLOY_ENV}.yml"
+            env.PROJECT_NAME = "log-generator-${params.DEPLOY_ENV}"
 
-          // Define microservices (adjust dockerfile name if different)
-          services = [
-            [name: 'log-collector',         context: 'log-collector',         dockerfile: 'Dockerfile'],
-            [name: 'log-generator',         context: 'log-generator',         dockerfile: 'Dockerfile'],
-            [name: 'log-listener',          context: 'log-listener',          dockerfile: 'Dockerfile'],
-            [name: 'log-ui',                context: 'log-ui',                dockerfile: 'Dockerfile'],
-            [name: 'persistor-application', context: 'persistor-application', dockerfile: 'Dockerfile'],
-            [name: 'persistor-auth',        context: 'persistor-auth',        dockerfile: 'Dockerfile'],
-            [name: 'persistor-payment',     context: 'persistor-payment',     dockerfile: 'Dockerfile'],
-            [name: 'persistor-system',      context: 'persistor-system',      dockerfile: 'Dockerfile'],
-          ]
+            services = [
+              [name: 'log-collector',         context: 'log-collector',         dockerfile: 'Dockerfile'],
+              [name: 'log-generator',         context: 'log-generator',         dockerfile: 'Dockerfile'],
+              [name: 'log-listener',          context: 'log-listener',          dockerfile: 'Dockerfile'],
+              [name: 'log-ui',                context: 'log-ui',                dockerfile: 'Dockerfile'],
+              [name: 'persistor-application', context: 'persistor-application', dockerfile: 'Dockerfile'],
+              [name: 'persistor-auth',        context: 'persistor-auth',        dockerfile: 'Dockerfile'],
+              [name: 'persistor-payment',     context: 'persistor-payment',     dockerfile: 'Dockerfile'],
+              [name: 'persistor-system',      context: 'persistor-system',      dockerfile: 'Dockerfile'],
+            ]
 
-          sh """ test -f "${env.COMPOSE_FILE}" || (echo "Missing ${env.COMPOSE_FILE}" && exit 1) """
+            sh """ test -f "${env.COMPOSE_FILE}" || (echo "Missing ${env.COMPOSE_FILE}" && exit 1) """
 
-          echo """
-          Build context:
-            DEPLOY_ENV       = ${params.DEPLOY_ENV}
-            COMPOSE_FILE     = ${env.COMPOSE_FILE}
-            PROJECT_NAME     = ${env.PROJECT_NAME}
-            IMAGE_TAG        = ${env.IMAGE_TAG}
-            PUSH_TO_REGISTRY = ${params.PUSH_TO_REGISTRY}
-            REGISTRY         = ${params.REGISTRY}
-            IMAGE_PREFIX     = ${params.IMAGE_PREFIX}
-          """
+            echo """
+            Build context:
+              DEPLOY_ENV       = ${params.DEPLOY_ENV}
+              COMPOSE_FILE     = ${env.COMPOSE_FILE}
+              PROJECT_NAME     = ${env.PROJECT_NAME}
+              IMAGE_TAG        = ${env.IMAGE_TAG}
+              PUSH_TO_REGISTRY = ${params.PUSH_TO_REGISTRY}
+              REGISTRY         = ${params.REGISTRY}
+              IMAGE_PREFIX     = ${params.IMAGE_PREFIX}
+            """
+          }
         }
       }
     }
@@ -86,44 +90,48 @@ pipeline {
         expression { params.PUSH_TO_REGISTRY && params.REGISTRY?.trim() && params.REGISTRY_CREDENTIALS_ID?.trim() }
       }
       steps {
-        withCredentials([usernamePassword(
-          credentialsId: params.REGISTRY_CREDENTIALS_ID,
-          usernameVariable: 'REG_USER',
-          passwordVariable: 'REG_PASS'
-        )]) {
-          sh '''
-            set -e
-            REG_HOST="${REGISTRY%%/*}"
-            if [ -z "$REG_HOST" ]; then
-              echo "Cannot derive registry host from REGISTRY=${REGISTRY}"
-              exit 1
-            fi
-            echo "$REG_PASS" | docker login "$REG_HOST" --username "$REG_USER" --password-stdin
-          '''
+        ansiColor('xterm') {
+          withCredentials([usernamePassword(
+            credentialsId: params.REGISTRY_CREDENTIALS_ID,
+            usernameVariable: 'REG_USER',
+            passwordVariable: 'REG_PASS'
+          )]) {
+            sh '''
+              set -e
+              REG_HOST="${REGISTRY%%/*}"
+              if [ -z "$REG_HOST" ]; then
+                echo "Cannot derive registry host from REGISTRY=${REGISTRY}"
+                exit 1
+              fi
+              echo "$REG_PASS" | docker login "$REG_HOST" --username "$REG_USER" --password-stdin
+            '''
+          }
         }
       }
     }
 
     stage('Build Images (per service, parallel)') {
       steps {
-        script {
-          def branches = [:]
-          services.each { svc ->
-            branches[svc.name] = {
-              dir(svc.context) {
-                sh """
-                  set -euxo pipefail
-                  REPO_BASE="${params.REGISTRY?.trim() ? params.REGISTRY + '/' : ''}${params.IMAGE_PREFIX}-${svc.name}"
-                  docker build --pull \
-                    -f "${svc.dockerfile}" \
-                    -t "${REPO_BASE}:${env.IMAGE_TAG}" \
-                    -t "${REPO_BASE}:latest" \
-                    .
-                """
+        ansiColor('xterm') {
+          script {
+            def branches = [:]
+            services.each { svc ->
+              branches[svc.name] = {
+                dir(svc.context) {
+                  sh """
+                    set -euxo pipefail
+                    REPO_BASE="${params.REGISTRY?.trim() ? params.REGISTRY + '/' : ''}${params.IMAGE_PREFIX}-${svc.name}"
+                    docker build --pull \
+                      -f "${svc.dockerfile}" \
+                      -t "${REPO_BASE}:${env.IMAGE_TAG}" \
+                      -t "${REPO_BASE}:latest" \
+                      .
+                  """
+                }
               }
             }
+            parallel branches
           }
-          parallel branches
         }
       }
     }
@@ -131,14 +139,16 @@ pipeline {
     stage('Push Images (optional)') {
       when { expression { params.PUSH_TO_REGISTRY && params.REGISTRY?.trim() } }
       steps {
-        script {
-          services.each { svc ->
-            sh """
-              set -euxo pipefail
-              REPO_BASE="${params.REGISTRY}/${params.IMAGE_PREFIX}-${svc.name}"
-              docker push "${REPO_BASE}:${env.IMAGE_TAG}"
-              docker push "${REPO_BASE}:latest"
-            """
+        ansiColor('xterm') {
+          script {
+            services.each { svc ->
+              sh """
+                set -euxo pipefail
+                REPO_BASE="${params.REGISTRY}/${params.IMAGE_PREFIX}-${svc.name}"
+                docker push "${REPO_BASE}:${env.IMAGE_TAG}"
+                docker push "${REPO_BASE}:latest"
+              """
+            }
           }
         }
       }
@@ -146,46 +156,53 @@ pipeline {
 
     stage('Deploy (docker compose up -d)') {
       steps {
-        sh """
-          set -euxo pipefail
-          # Export vars so your compose file can reference them if needed
-          export REGISTRY="${params.REGISTRY}"
-          export IMAGE_PREFIX="${params.IMAGE_PREFIX}"
-          export IMAGE_TAG="${env.IMAGE_TAG}"
+        ansiColor('xterm') {
+          sh """
+            set -euxo pipefail
+            export REGISTRY="${params.REGISTRY}"
+            export IMAGE_PREFIX="${params.IMAGE_PREFIX}"
+            export IMAGE_TAG="${env.IMAGE_TAG}"
 
-          # Avoid rebuilds if compose has 'build:' blocks
-          docker compose -p "${env.PROJECT_NAME}" -f "${env.COMPOSE_FILE}" up -d --no-build --remove-orphans
-          docker compose -p "${env.PROJECT_NAME}" -f "${env.COMPOSE_FILE}" ps
-        """
+            docker compose -p "${env.PROJECT_NAME}" -f "${env.COMPOSE_FILE}" up -d --no-build --remove-orphans
+            docker compose -p "${env.PROJECT_NAME}" -f "${env.COMPOSE_FILE}" ps
+          """
+        }
       }
     }
 
     stage('Smoke Check (basic)') {
       steps {
-        sh '''
-          set -euxo pipefail
-          docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=100 || true
-        '''
+        ansiColor('xterm') {
+          sh '''
+            set -euxo pipefail
+            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=100 || true
+          '''
+        }
       }
     }
   }
 
   post {
     success {
-      echo "✅ Built per-service Docker images and deployed ${env.PROJECT_NAME} with tag ${env.IMAGE_TAG}"
+      ansiColor('xterm') {
+        echo "✅ Built per-service Docker images and deployed ${env.PROJECT_NAME} with tag ${env.IMAGE_TAG}"
+      }
     }
     failure {
-      script {
-        echo "❌ Build/Deploy failed. Dumping compose status & recent logs…"
-        sh '''
-          docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps || true
-          docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=200 || true
-        '''
+      ansiColor('xterm') {
+        script {
+          echo "❌ Build/Deploy failed. Dumping compose status & recent logs…"
+          sh '''
+            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps || true
+            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=200 || true
+          '''
+        }
       }
     }
     always {
-      sh 'docker system df || true'
+      ansiColor('xterm') {
+        sh 'docker system df || true'
+      }
     }
   }
 }
-
