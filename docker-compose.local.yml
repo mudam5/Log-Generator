@@ -1,0 +1,23 @@
+version: "3.8"
+
+services:
+  log-listener:
+    build: ./log-listener
+    container_name: log-pipeline-log-listener
+    ports:
+      - "5001:5001"
+    environment:
+      # ✅ must point to EC2 collector /collect endpoint
+      - COLLECTOR_URL=http://54.226.16.205:5002/collect
+
+  log-generator:
+    build: ./log-generator
+    container_name: log-pipeline-log-generator
+    depends_on:
+      - log-listener
+    ports:
+      - "5000:5000"
+    environment:
+      # ✅ generator pushes logs to listener
+      - LISTENER_URL=http://log-listener:5001/logs
+

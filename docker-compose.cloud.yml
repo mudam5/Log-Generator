@@ -1,0 +1,71 @@
+version: "3.8"
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: logs_user
+      POSTGRES_PASSWORD: logs_pass
+      POSTGRES_DB: logsdb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  log-collector:
+    build: ./log-collector
+    environment:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=logsdb
+      - POSTGRES_USER=logs_user
+      - POSTGRES_PASSWORD=logs_pass
+      - PERSISTOR_AUTH=persistor-auth
+      - PERSISTOR_PAYMENT=persistor-payment
+      - PERSISTOR_SYSTEM=persistor-system
+      - PERSISTOR_APPLICATION=persistor-application
+      - PERSISTOR_PORT=6000
+    depends_on:
+      - postgres
+    volumes:
+      - collector-data:/data
+
+  persistor-auth:
+    build: ./persistor-auth
+    environment:
+      - STORE_FILE=/data/auth_logs.json
+    volumes:
+      - persistor-auth-data:/data
+
+  persistor-payment:
+    build: ./persistor-payment
+    environment:
+      - STORE_FILE=/data/payment_logs.json
+    volumes:
+      - persistor-payment-data:/data
+
+  persistor-system:
+    build: ./persistor-system
+    environment:
+      - STORE_FILE=/data/system_logs.json
+    volumes:
+      - persistor-system-data:/data
+
+  persistor-application:
+    build: ./persistor-application
+    environment:
+      - STORE_FILE=/data/application_logs.json
+    volumes:
+      - persistor-application-data:/data
+
+  log-ui:
+    build: ./log-ui
+    ports:
+      - "80:80"
+    depends_on:
+      - log-collector
+
+volumes:
+  pgdata:
+  collector-data:
+  persistor-auth-data:
+  persistor-payment-data:
+  persistor-system-data:
+  persistor-application-data:
