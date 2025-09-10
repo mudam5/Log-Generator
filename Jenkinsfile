@@ -30,17 +30,17 @@ pipeline {
       steps {
         ansiColor('xterm') {
           script {
-            def services = [
-              [name: 'log-collector',         context: 'log-collector',         dockerfile: 'Dockerfile'],
-              [name: 'log-generator',         context: 'log-generator',         dockerfile: 'Dockerfile'],
-              [name: 'log-listener',          context: 'log-listener',          dockerfile: 'Dockerfile'],
-              [name: 'log-ui',                context: 'log-ui',                dockerfile: 'Dockerfile'],
-              [name: 'persistor-application', context: 'persistor-application', dockerfile: 'Dockerfile'],
-              [name: 'persistor-auth',        context: 'persistor-auth',        dockerfile: 'Dockerfile'],
-              [name: 'persistor-payment',     context: 'persistor-payment',     dockerfile: 'Dockerfile'],
-              [name: 'persistor-system',      context: 'persistor-system',      dockerfile: 'Dockerfile']
+            def svcList = [
+              ["name": "log-collector",         "context": "log-collector",         "dockerfile": "Dockerfile"],
+              ["name": "log-generator",         "context": "log-generator",         "dockerfile": "Dockerfile"],
+              ["name": "log-listener",          "context": "log-listener",          "dockerfile": "Dockerfile"],
+              ["name": "log-ui",                "context": "log-ui",                "dockerfile": "Dockerfile"],
+              ["name": "persistor-application", "context": "persistor-application", "dockerfile": "Dockerfile"],
+              ["name": "persistor-auth",        "context": "persistor-auth",        "dockerfile": "Dockerfile"],
+              ["name": "persistor-payment",     "context": "persistor-payment",     "dockerfile": "Dockerfile"],
+              ["name": "persistor-system",      "context": "persistor-system",      "dockerfile": "Dockerfile"]
             ]
-            env.services = services
+            writeJSON file: 'services.json', json: svcList
             sh """ test -f "${COMPOSE_FILE}" || (echo "Missing ${COMPOSE_FILE}" && exit 1) """
           }
         }
@@ -51,9 +51,9 @@ pipeline {
       steps {
         ansiColor('xterm') {
           script {
+            def svcList = readJSON file: 'services.json'
             def branches = [:]
-            def services = env.services
-            services.each { svc ->
+            svcList.each { svc ->
               branches[svc.name] = {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
                   dir(svc.context) {
@@ -81,8 +81,8 @@ pipeline {
       steps {
         ansiColor('xterm') {
           script {
-            def services = env.services
-            services.each { svc ->
+            def svcList = readJSON file: 'services.json'
+            svcList.each { svc ->
               sh """
                 REPO_BASE="${REGISTRY}/${IMAGE_PREFIX}-${svc.name}"
                 docker push "\$REPO_BASE:${IMAGE_TAG}"
