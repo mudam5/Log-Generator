@@ -10,7 +10,7 @@ services:
       - pgdata:/var/lib/postgresql/data
 
   log-collector:
-    build: ./log-collector
+    image: docker.io/mudam5/log-log-collector:latest
     environment:
       - POSTGRES_HOST=postgres
       - POSTGRES_PORT=5432
@@ -28,35 +28,35 @@ services:
       - collector-data:/data
 
   persistor-auth:
-    build: ./persistor-auth
+    image: docker.io/mudam5/log-persistor-auth:latest
     environment:
       - STORE_FILE=/data/auth_logs.json
     volumes:
       - persistor-auth-data:/data
 
   persistor-payment:
-    build: ./persistor-payment
+    image: docker.io/mudam5/log-persistor-payment:latest
     environment:
       - STORE_FILE=/data/payment_logs.json
     volumes:
       - persistor-payment-data:/data
 
   persistor-system:
-    build: ./persistor-system
+    image: docker.io/mudam5/log-persistor-system:latest
     environment:
       - STORE_FILE=/data/system_logs.json
     volumes:
       - persistor-system-data:/data
 
   persistor-application:
-    build: ./persistor-application
+    image: docker.io/mudam5/log-persistor-application:latest
     environment:
       - STORE_FILE=/data/application_logs.json
     volumes:
       - persistor-application-data:/data
 
   log-ui:
-    build: ./log-ui
+    image: docker.io/mudam5/log-log-ui:latest
     ports:
       - "80:80"
     depends_on:
