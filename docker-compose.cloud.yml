@@ -1,4 +1,4 @@
-version: "3.8"
+version: '3.8'
 services:
   postgres:
     image: postgres:15
@@ -7,65 +7,74 @@ services:
       POSTGRES_PASSWORD: logs_pass
       POSTGRES_DB: logsdb
     volumes:
-      - pgdata:/var/lib/postgresql/data
-
+    - pgdata:/var/lib/postgresql/data
   log-collector:
     image: docker.io/mudam5/log-log-collector:latest
     environment:
-      - POSTGRES_HOST=postgres
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=logsdb
-      - POSTGRES_USER=logs_user
-      - POSTGRES_PASSWORD=logs_pass
-      - PERSISTOR_AUTH=persistor-auth
-      - PERSISTOR_PAYMENT=persistor-payment
-      - PERSISTOR_SYSTEM=persistor-system
-      - PERSISTOR_APPLICATION=persistor-application
-      - PERSISTOR_PORT=6000
+    - POSTGRES_HOST=postgres
+    - POSTGRES_PORT=5432
+    - POSTGRES_DB=logsdb
+    - POSTGRES_USER=logs_user
+    - POSTGRES_PASSWORD=logs_pass
+    - PERSISTOR_AUTH=persistor-auth
+    - PERSISTOR_PAYMENT=persistor-payment
+    - PERSISTOR_SYSTEM=persistor-system
+    - PERSISTOR_APPLICATION=persistor-application
+    - PERSISTOR_PORT=6000
     depends_on:
-      - postgres
+    - postgres
     volumes:
-      - collector-data:/data
-
+    - collector-data:/data
   persistor-auth:
     image: docker.io/mudam5/log-persistor-auth:latest
     environment:
-      - STORE_FILE=/data/auth_logs.json
+    - STORE_FILE=/data/auth_logs.json
     volumes:
-      - persistor-auth-data:/data
-
+    - persistor-auth-data:/data
   persistor-payment:
     image: docker.io/mudam5/log-persistor-payment:latest
     environment:
-      - STORE_FILE=/data/payment_logs.json
+    - STORE_FILE=/data/payment_logs.json
     volumes:
-      - persistor-payment-data:/data
-
+    - persistor-payment-data:/data
   persistor-system:
     image: docker.io/mudam5/log-persistor-system:latest
     environment:
-      - STORE_FILE=/data/system_logs.json
+    - STORE_FILE=/data/system_logs.json
     volumes:
-      - persistor-system-data:/data
-
+    - persistor-system-data:/data
   persistor-application:
     image: docker.io/mudam5/log-persistor-application:latest
     environment:
-      - STORE_FILE=/data/application_logs.json
+    - STORE_FILE=/data/application_logs.json
     volumes:
-      - persistor-application-data:/data
-
+    - persistor-application-data:/data
   log-ui:
     image: docker.io/mudam5/log-log-ui:latest
     ports:
-      - "80:80"
+    - 80:80
     depends_on:
-      - log-collector
-
+    - log-collector
+  log-listener:
+    image: docker.io/mudam5/log-log-listener:latest
+    container_name: log-pipeline-log-listener
+    ports:
+    - 5001:5001
+    environment:
+    - COLLECTOR_URL=http://54.226.16.205:5002/collect
+  log-generator:
+    image: docker.io/mudam5/log-log-generator:latest
+    container_name: log-pipeline-log-generator
+    depends_on:
+    - log-listener
+    ports:
+    - 5000:5000
+    environment:
+    - LISTENER_URL=http://log-listener:5001/logs
 volumes:
-  pgdata:
-  collector-data:
-  persistor-auth-data:
-  persistor-payment-data:
-  persistor-system-data:
-  persistor-application-data:
+  pgdata: null
+  collector-data: null
+  persistor-auth-data: null
+  persistor-payment-data: null
+  persistor-system-data: null
+  persistor-application-data: null
