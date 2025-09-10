@@ -8,31 +8,11 @@ pipeline {
   }
 
   parameters {
-    choice(
-      name: 'DEPLOY_ENV',
-      choices: ['local', 'cloud'],
-      description: 'Which docker-compose.<env>.yml to use for deploy'
-    )
-    booleanParam(
-      name: 'PUSH_TO_REGISTRY',
-      defaultValue: false,
-      description: 'If true, tag and push images to a container registry'
-    )
-    string(
-      name: 'REGISTRY',
-      defaultValue: '',
-      description: 'Registry namespace (e.g., docker.io/<user> or ghcr.io/<owner>). Leave empty for local-only.'
-    )
-    string(
-      name: 'IMAGE_PREFIX',
-      defaultValue: 'log',
-      description: 'Final repo will be <REGISTRY>/<IMAGE_PREFIX>-<service>'
-    )
-    string(
-      name: 'REGISTRY_CREDENTIALS_ID',
-      defaultValue: '',
-      description: 'Jenkins credentialsId for registry login (optional)'
-    )
+    choice(name: 'DEPLOY_ENV', choices: ['local', 'cloud'], description: 'Which docker-compose.<env>.yml to use for deploy')
+    booleanParam(name: 'PUSH_TO_REGISTRY', defaultValue: false, description: 'If true, tag and push images to a container registry')
+    string(name: 'REGISTRY', defaultValue: '', description: 'Registry namespace (e.g., docker.io/<user> or ghcr.io/<owner>). Leave empty for local-only.')
+    string(name: 'IMAGE_PREFIX', defaultValue: 'log', description: 'Final repo will be <REGISTRY>/<IMAGE_PREFIX>-<service>')
+    string(name: 'REGISTRY_CREDENTIALS_ID', defaultValue: '', description: 'Jenkins credentialsId for registry login (optional)')
   }
 
   environment {
@@ -65,7 +45,7 @@ pipeline {
               [name: 'persistor-application', context: 'persistor-application', dockerfile: 'Dockerfile'],
               [name: 'persistor-auth',        context: 'persistor-auth',        dockerfile: 'Dockerfile'],
               [name: 'persistor-payment',     context: 'persistor-payment',     dockerfile: 'Dockerfile'],
-              [name: 'persistor-system',      context: 'persistor-system',      dockerfile: 'Dockerfile'],
+              [name: 'persistor-system',      context: 'persistor-system',      dockerfile: 'Dockerfile']
             ]
 
             sh """ test -f "${env.COMPOSE_FILE}" || (echo "Missing ${env.COMPOSE_FILE}" && exit 1) """
@@ -91,11 +71,7 @@ pipeline {
       }
       steps {
         ansiColor('xterm') {
-          withCredentials([usernamePassword(
-            credentialsId: params.REGISTRY_CREDENTIALS_ID,
-            usernameVariable: 'REG_USER',
-            passwordVariable: 'REG_PASS'
-          )]) {
+          withCredentials([usernamePassword(credentialsId: params.REGISTRY_CREDENTIALS_ID, usernameVariable: 'REG_USER', passwordVariable: 'REG_PASS')]) {
             sh '''
               set -e
               REG_HOST="${REGISTRY%%/*}"
@@ -137,7 +113,9 @@ pipeline {
     }
 
     stage('Push Images (optional)') {
-      when { expression { params.PUSH_TO_REGISTRY && params.REGISTRY?.trim() } }
+      when {
+        expression { params.PUSH_TO_REGISTRY && params.REGISTRY?.trim() }
+      }
       steps {
         ansiColor('xterm') {
           script {
