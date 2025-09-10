@@ -30,7 +30,7 @@ pipeline {
       steps {
         ansiColor('xterm') {
           script {
-            services = [
+            def services = [
               [name: 'log-collector',         context: 'log-collector',         dockerfile: 'Dockerfile'],
               [name: 'log-generator',         context: 'log-generator',         dockerfile: 'Dockerfile'],
               [name: 'log-listener',          context: 'log-listener',          dockerfile: 'Dockerfile'],
@@ -40,7 +40,7 @@ pipeline {
               [name: 'persistor-payment',     context: 'persistor-payment',     dockerfile: 'Dockerfile'],
               [name: 'persistor-system',      context: 'persistor-system',      dockerfile: 'Dockerfile']
             ]
-
+            env.services = services
             sh """ test -f "${COMPOSE_FILE}" || (echo "Missing ${COMPOSE_FILE}" && exit 1) """
           }
         }
@@ -52,6 +52,7 @@ pipeline {
         ansiColor('xterm') {
           script {
             def branches = [:]
+            def services = env.services
             services.each { svc ->
               branches[svc.name] = {
                 catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
@@ -59,11 +60,11 @@ pipeline {
                     sh """
                       echo '🔧 Building service: ${svc.name}'
                       REPO_BASE="${REGISTRY}/${IMAGE_PREFIX}-${svc.name}"
-                      echo "Using REPO_BASE: ${REPO_BASE}"
+                      echo "Using REPO_BASE: \$REPO_BASE"
                       docker build --pull \
                         -f "${svc.dockerfile}" \
-                        -t "${REPO_BASE}:${IMAGE_TAG}" \
-                        -t "${REPO_BASE}:latest" \
+                        -t "\$REPO_BASE:${IMAGE_TAG}" \
+                        -t "\$REPO_BASE:latest" \
                         . || (echo "❌ Build failed for ${svc.name}" && exit 1)
                     """
                   }
@@ -80,11 +81,12 @@ pipeline {
       steps {
         ansiColor('xterm') {
           script {
+            def services = env.services
             services.each { svc ->
               sh """
                 REPO_BASE="${REGISTRY}/${IMAGE_PREFIX}-${svc.name}"
-                docker push "${REPO_BASE}:${IMAGE_TAG}"
-                docker push "${REPO_BASE}:latest"
+                docker push "\$REPO_BASE:${IMAGE_TAG}"
+                docker push "\$REPO_BASE:latest"
               """
             }
           }
