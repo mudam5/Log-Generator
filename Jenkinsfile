@@ -13,7 +13,7 @@ pipeline {
     REGISTRY = 'docker.io/mudam5'
     IMAGE_PREFIX = 'log'
     IMAGE_TAG = 'latest'
-    COMPOSE_FILE = "docker-compose.local.yml"
+    COMPOSE_FILES = "-f docker-compose.local.yml -f docker-compose.cloud.yml"
     PROJECT_NAME = "log-generator-local"
   }
 
@@ -83,18 +83,17 @@ pipeline {
         ansiColor('xterm') {
           script {
             def services = [
-              [name: 'log-collector'],
-              [name: 'log-generator'],
-              [name: 'log-listener'],
-              [name: 'log-ui'],
-              [name: 'persistor-application'],
-              [name: 'persistor-auth'],
-              [name: 'persistor-payment'],
-              [name: 'persistor-system']
+              'log-collector',
+              'log-generator',
+              'log-listener',
+              'log-ui',
+              'persistor-application',
+              'persistor-auth',
+              'persistor-payment',
+              'persistor-system'
             ]
 
-            services.each { svc ->
-              def svcName = svc.name
+            services.each { svcName ->
               sh """
                 REPO_BASE="${REGISTRY}/${IMAGE_PREFIX}-${svcName}"
                 docker push "\$REPO_BASE:${IMAGE_TAG}"
@@ -110,8 +109,8 @@ pipeline {
       steps {
         ansiColor('xterm') {
           sh """
-            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" up -d --no-build --remove-orphans
-            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps
+            docker compose -p "${PROJECT_NAME}" ${COMPOSE_FILES} up -d --no-build --remove-orphans
+            docker compose -p "${PROJECT_NAME}" ${COMPOSE_FILES} ps
           """
         }
       }
@@ -121,7 +120,7 @@ pipeline {
       steps {
         ansiColor('xterm') {
           sh """
-            docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=100 || true
+            docker compose -p "${PROJECT_NAME}" ${COMPOSE_FILES} logs --no-color --tail=100 || true
           """
         }
       }
@@ -138,8 +137,8 @@ pipeline {
       ansiColor('xterm') {
         echo "❌ Build/Deploy failed. Dumping logs..."
         sh """
-          docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" ps || true
-          docker compose -p "${PROJECT_NAME}" -f "${COMPOSE_FILE}" logs --no-color --tail=200 || true
+          docker compose -p "${PROJECT_NAME}" ${COMPOSE_FILES} ps || true
+          docker compose -p "${PROJECT_NAME}" ${COMPOSE_FILES} logs --no-color --tail=200 || true
         """
       }
     }
