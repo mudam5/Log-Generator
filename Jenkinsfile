@@ -14,7 +14,7 @@ pipeline {
     IMAGE_PREFIX = 'log'
     IMAGE_TAG = 'latest'
     COMPOSE_FILES = "-f docker-compose.local.yml -f docker-compose.cloud.yml"
-    PROJECT_NAME = "log-generator-local"
+    PROJECT_NAME = "log-generator-combined"
   }
 
   stages {
@@ -61,7 +61,6 @@ pipeline {
                     sh """
                       echo '🔧 Building service: ${svc.name}'
                       REPO_BASE="${REGISTRY}/${IMAGE_PREFIX}-${svc.name}"
-                      echo "Using REPO_BASE: \$REPO_BASE"
                       docker build --pull \
                         -f "${svc.dockerfile}" \
                         -t "\$REPO_BASE:${IMAGE_TAG}" \
@@ -101,6 +100,19 @@ pipeline {
               """
             }
           }
+        }
+      }
+    }
+
+    stage('Pre-Deploy Cleanup') {
+      steps {
+        ansiColor('xterm') {
+          sh '''
+            echo "🧹 Cleaning up conflicting containers..."
+            docker rm -f log-pipeline-log-listener || true
+            docker rm -f log-pipeline-log-generator || true
+            docker rm -f log-pipeline-log-ui || true
+          '''
         }
       }
     }
