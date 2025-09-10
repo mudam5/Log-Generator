@@ -2,7 +2,7 @@ version: "3.8"
 
 services:
   log-listener:
-    build: ./log-listener
+    image: docker.io/mudam5/log-log-listener:latest
     container_name: log-pipeline-log-listener
     ports:
       - "5001:5001"
@@ -11,7 +11,7 @@ services:
       - COLLECTOR_URL=http://54.226.16.205:5002/collect
 
   log-generator:
-    build: ./log-generator
+    image: docker.io/mudam5/log-log-generator:latest
     container_name: log-pipeline-log-generator
     depends_on:
       - log-listener
@@ -20,4 +20,3 @@ services:
     environment:
       # ✅ generator pushes logs to listener
       - LISTENER_URL=http://log-listener:5001/logs
-
