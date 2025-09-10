@@ -93,16 +93,19 @@ pipeline {
             def branches = [:]
             services.each { svc ->
               branches[svc.name] = {
-                dir(svc.context) {
-                  sh """
-                    set -euxo pipefail
-                    REPO_BASE="${params.REGISTRY?.trim() ? params.REGISTRY + '/' : ''}${params.IMAGE_PREFIX}-${svc.name}"
-                    docker build --pull \
-                      -f "${svc.dockerfile}" \
-                      -t "${REPO_BASE}:${env.IMAGE_TAG}" \
-                      -t "${REPO_BASE}:latest" \
-                      .
-                  """
+                catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                  dir(svc.context) {
+                    sh """
+                      echo '🔧 Building service: ${svc.name}'
+                      REPO_BASE="${params.REGISTRY?.trim() ? params.REGISTRY + '/' : ''}${params.IMAGE_PREFIX}-${svc.name}"
+                      echo "Using REPO_BASE: ${REPO_BASE}"
+                      docker build --pull \
+                        -f "${svc.dockerfile}" \
+                        -t "${REPO_BASE}:${env.IMAGE_TAG}" \
+                        -t "${REPO_BASE}:latest" \
+                        . || (echo "❌ Build failed for ${svc.name}" && exit 1)
+                    """
+                  }
                 }
               }
             }
