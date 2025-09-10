@@ -8,6 +8,8 @@ services:
       POSTGRES_DB: logsdb
     volumes:
     - pgdata:/var/lib/postgresql/data
+    networks:
+    - shared-net
   log-collector:
     image: docker.io/mudam5/log-log-collector:latest
     environment:
@@ -25,36 +27,48 @@ services:
     - postgres
     volumes:
     - collector-data:/data
+    networks:
+    - shared-net
   persistor-auth:
     image: docker.io/mudam5/log-persistor-auth:latest
     environment:
     - STORE_FILE=/data/auth_logs.json
     volumes:
     - persistor-auth-data:/data
+    networks:
+    - shared-net
   persistor-payment:
     image: docker.io/mudam5/log-persistor-payment:latest
     environment:
     - STORE_FILE=/data/payment_logs.json
     volumes:
     - persistor-payment-data:/data
+    networks:
+    - shared-net
   persistor-system:
     image: docker.io/mudam5/log-persistor-system:latest
     environment:
     - STORE_FILE=/data/system_logs.json
     volumes:
     - persistor-system-data:/data
+    networks:
+    - shared-net
   persistor-application:
     image: docker.io/mudam5/log-persistor-application:latest
     environment:
     - STORE_FILE=/data/application_logs.json
     volumes:
     - persistor-application-data:/data
+    networks:
+    - shared-net
   log-ui:
     image: docker.io/mudam5/log-log-ui:latest
     ports:
     - 80:80
     depends_on:
     - log-collector
+    networks:
+    - shared-net
   log-listener:
     image: docker.io/mudam5/log-log-listener:latest
     container_name: log-pipeline-log-listener
@@ -62,6 +76,8 @@ services:
     - 5001:5001
     environment:
     - COLLECTOR_URL=http://54.226.16.205:5002/collect
+    networks:
+    - shared-net
   log-generator:
     image: docker.io/mudam5/log-log-generator:latest
     container_name: log-pipeline-log-generator
@@ -71,6 +87,8 @@ services:
     - 5000:5000
     environment:
     - LISTENER_URL=http://log-listener:5001/logs
+    networks:
+    - shared-net
 volumes:
   pgdata: null
   collector-data: null
@@ -78,3 +96,6 @@ volumes:
   persistor-payment-data: null
   persistor-system-data: null
   persistor-application-data: null
+networks:
+  shared-net:
+    external: true
